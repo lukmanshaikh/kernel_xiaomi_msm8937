@@ -52,6 +52,10 @@
 #include <linux/file.h>
 #include <linux/err.h>
 
+#ifdef CONFIG_WAKE_GESTURES
+#include <linux/wake_gestures.h>
+#endif
+
 #ifdef CONFIG_OF
 #include <linux/of.h>
 #include <linux/of_gpio.h>
@@ -201,6 +205,13 @@ void ist30xx_enable_irq(struct ist30xx_data *data)
 		data->status.event_mode = true;
 	}
 }
+
+#ifdef CONFIG_WAKE_GESTURES
+struct ist30xx_data *ist30xx_ts = NULL;
+bool scr_suspended_ist(void) {
+	return ist30xx_ts->suspended;
+}
+#endif
 
 void ist30xx_scheduled_reset(struct ist30xx_data *data)
 {
@@ -1246,13 +1257,65 @@ irq_ic_err:
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_WAKE_GESTURES
+static bool ev_btn_status = false;
+static bool ist30xx_irq_active = false;
+static void ist30xx_irq_handler(int irq, bool active)
+{
+	if (active) {
+		if (!ist30xx_irq_active) {
+			enable_irq_wake(irq);
+			ist30xx_irq_active = true;
+		}
+	} else {
+		if (ist30xx_irq_active) {
+			disable_irq_wake(irq);
+			ist30xx_irq_active = false;
+		}
+	}
+}
+#endif
+
 #ifdef CONFIG_PM
 static int ist30xx_suspend(struct device *dev)
 {
 	struct ist30xx_data *data = dev_get_drvdata(dev);
+#ifdef CONFIG_WAKE_GESTURES
+	int i;
+#endif
 
 	if (data->debugging_mode)
 		return 0;
+
+#ifdef CONFIG_WAKE_GESTURES
+	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+
+		if (!ev_btn_status) {
+			/* release all touches */
+			for (i = 0; i < IST30XX_MAX_MT_FINGERS; i++) {
+				input_mt_slot(data->input_dev, i);
+				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 0);
+			}
+			input_mt_report_pointer_emulation(data->input_dev, false);
+			__clear_bit(BTN_TOUCH, data->input_dev->keybit);
+			input_sync(data->input_dev);
+			ev_btn_status = true;
+		}
+		ist30xx_irq_handler(data->client->irq, true);
+		data->suspended = true;
+
+		if (dt2w_switch_changed) {
+			dt2w_switch = dt2w_switch_temp;
+			dt2w_switch_changed = false;
+		}
+		if (s2w_switch_changed) {
+			s2w_switch = s2w_switch_temp;
+			s2w_switch_changed = false;
+		}
+
+		return 0;
+	}
+#endif
 
 	del_timer(&event_timer);
 	cancel_delayed_work_sync(&data->work_noise_protect);
@@ -1274,6 +1337,9 @@ static int ist30xx_suspend(struct device *dev)
 #endif
 	mutex_unlock(&ist30xx_mutex);
 
+#ifdef CONFIG_WAKE_GESTURES
+	data->suspended = true;
+#endif
 	return 0;
 }
 
@@ -1285,6 +1351,22 @@ static int ist30xx_resume(struct device *dev)
 
 	if (data->debugging_mode && data->status.power)
 		return 0;
+
+#ifdef CONFIG_WAKE_GESTURES
+	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+
+		if (ev_btn_status) {
+			__set_bit(BTN_TOUCH, data->input_dev->keybit);
+			input_sync(data->input_dev);
+			ev_btn_status = false;
+		}
+
+		ist30xx_irq_handler(data->client->irq, false);
+		data->suspended = false;
+
+		return 0;
+	}
+#endif
 
 	mutex_lock(&ist30xx_mutex);
 	ist30xx_internal_resume(data);
@@ -1313,6 +1395,9 @@ static int ist30xx_resume(struct device *dev)
 			      CHECK_CHARGER_INTERVAL);
 #endif
 
+#ifdef CONFIG_WAKE_GESTURES
+	data->suspended = false;
+#endif
 	return 0;
 }
 
@@ -2106,6 +2191,11 @@ static int ist30xx_probe(struct i2c_client *client,
 	if (unlikely(ret))
 		goto err_init_drv;
 
+#ifdef CONFIG_WAKE_GESTURES
+	ist30xx_ts = data;
+	device_init_wakeup(&client->dev, 1);
+#endif
+
 	ist30xx_disable_irq(data);
 	data->status.event_mode = false;
 
@@ -2159,6 +2249,9 @@ static int ist30xx_probe(struct i2c_client *client,
 #if IST30XX_GESTURE
 	data->suspend = false;
 	data->gesture = false;
+#endif
+#ifdef CONFIG_WAKE_GESTURES
+	data->suspended = false;
 #endif
 	data->ignore_delay = false;
 	data->secure_mode = false;
