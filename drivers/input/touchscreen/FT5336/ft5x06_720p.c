@@ -34,6 +34,10 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_WAKE_GESTURES
+#include <linux/wake_gestures.h>
+#endif
+
 #if CTP_CHARGER_DETECT
 #include <linux/power_supply.h>
 #endif
@@ -208,6 +212,13 @@ static int focal_i2c_Read(unsigned char *writebuf,
 	}
 	return ret;
 }
+
+#ifdef CONFIG_WAKE_GESTURES
+struct ft5x06_ts_data *ft5x06_ts = NULL;
+bool scr_suspended_ft(void) {
+	return ft5x06_ts->suspended;
+}
+#endif
 
 static int focal_i2c_Write(unsigned char *writebuf, int writelen)
 {
@@ -595,6 +606,9 @@ static int ft5x06_ts_pinctrl_select(struct ft5x06_ts_data *ft5x06_data,
 }
 
 
+#ifdef CONFIG_WAKE_GESTURES
+static bool ev_btn_status = false;
+#endif
 #ifdef CONFIG_PM
 static int ft5x06_ts_suspend(struct device *dev)
 {
@@ -611,6 +625,38 @@ static int ft5x06_ts_suspend(struct device *dev)
 		dev_info(dev, "Already in suspend state\n");
 		return 0;
 	}
+
+#ifdef CONFIG_WAKE_GESTURES
+	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+		if (!ev_btn_status) {
+			for (i = 0; i < data->pdata->num_max_touches; i++) {
+				input_mt_slot(data->input_dev, i);
+				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 0);
+			}
+			input_mt_report_pointer_emulation(data->input_dev, false);
+			__clear_bit(BTN_TOUCH, data->input_dev->keybit);
+			input_sync(data->input_dev);
+			ev_btn_status = true;
+		}
+
+		err = enable_irq_wake(data->client->irq);
+		if (err)
+			dev_err(&data->client->dev,
+				"%s: set_irq_wake failed\n", __func__);
+		data->suspended = true;
+
+		if (dt2w_switch_changed) {
+			dt2w_switch = dt2w_switch_temp;
+			dt2w_switch_changed = false;
+		}
+		if (s2w_switch_changed) {
+			s2w_switch = s2w_switch_temp;
+			s2w_switch_changed = false;
+		}
+
+		return err;
+	}
+#endif
 
 	disable_irq(data->client->irq);
 
@@ -671,6 +717,22 @@ static int ft5x06_ts_resume(struct device *dev)
 		return 0;
 	}
 
+#ifdef CONFIG_WAKE_GESTURES
+	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+		if (ev_btn_status) {
+			__set_bit(BTN_TOUCH, data->input_dev->keybit);
+			input_sync(data->input_dev);
+			ev_btn_status = false;
+		}
+		err = disable_irq_wake(data->client->irq);
+		if (err)
+			dev_err(dev, "%s: disable_irq_wake failed\n",
+				__func__);
+		data->suspended = false;
+
+		return err;
+	}
+#endif
 
 	if (data->pdata->power_on) {
 		err = data->pdata->power_on(true);
@@ -2683,6 +2745,11 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 		dev_err(&client->dev, "request irq failed\n");
 		goto free_reset_gpio;
 	}
+
+#ifdef CONFIG_WAKE_GESTURES
+	ft5x06_ts = data;
+	device_init_wakeup(&client->dev, 1);
+#endif
 
 	disable_irq(data->client->irq);
 
