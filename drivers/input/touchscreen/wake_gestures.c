@@ -42,22 +42,20 @@
 #define DT2W_DEFAULT		0
 #define S2W_DEFAULT		0
 #define S2S_DEFAULT		0
-#define WG_PWRKEY_DUR           60
+#define WG_PWRKEY_DUR           30
 
-/* Redmi Note 3 */
-#define SWEEP_Y_MAX             1920
-#define SWEEP_X_MAX             1080
-#define SWEEP_EDGE		90
+/* Redmi 3 series */
+#define SWEEP_Y_MAX             1280
+#define SWEEP_X_MAX             720
+#define SWEEP_EDGE		70
 #define SWEEP_Y_LIMIT           SWEEP_Y_MAX-SWEEP_EDGE
 #define SWEEP_X_LIMIT           SWEEP_X_MAX-SWEEP_EDGE
-#define SWEEP_Y_LIMIT_ATMEL     1024-SWEEP_EDGE
-#define SWEEP_X_LIMIT_ATMEL     1024-SWEEP_EDGE
-#define SWEEP_X_B1              299
-#define SWEEP_X_B2              620
-#define SWEEP_Y_START		800
-#define SWEEP_X_START		540
-#define SWEEP_X_FINAL           270
-#define SWEEP_Y_NEXT            135
+#define SWEEP_X_B1              200
+#define SWEEP_X_B2              400
+#define SWEEP_Y_START		450
+#define SWEEP_X_START		300
+#define SWEEP_X_FINAL           150
+#define SWEEP_Y_NEXT            75
 #define DT2W_FEATHER		150
 #define DT2W_TIME 		500
 
@@ -489,12 +487,9 @@ static void wg_input_event(struct input_handle *handle, unsigned int type,
 }
 
 static int input_dev_filter(struct input_dev *dev) {
-	if (strstr(dev->name, "ft5x06_ts")) {
+	if (strstr(dev->name, "ft5x06_720p")) {
 		return 0;
-	} else if (strstr(dev->name, "Atmel")) {
-		hw_version = ATMEL;
-		sweep_y_limit = SWEEP_Y_LIMIT_ATMEL;
-		sweep_x_limit = SWEEP_X_LIMIT_ATMEL;
+	} else if (strstr(dev->name, "ist30xx_ts_input")) {
 		return 0;
 	} else {
 		return 1;
@@ -620,6 +615,10 @@ static ssize_t doubletap2wake_dump(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	sscanf(buf, "%d ", &dt2w_switch_temp);
+	// KA sets switch to 2 under 'Full' setting, fallback to 1..
+	if (dt2w_switch_temp == 2)
+		dt2w_switch_temp = 1;
+
 	if (dt2w_switch_temp < 0 || dt2w_switch_temp > 1)
 		dt2w_switch_temp = 0;
 		
