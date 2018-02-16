@@ -86,6 +86,7 @@ bool s2w_switch_changed = false;
 int dt2w_switch = DT2W_DEFAULT;
 int dt2w_switch_temp; 
 bool dt2w_switch_changed = false;
+bool is_incall = false;
 static int s2s_switch = S2S_DEFAULT;
 static int touch_x = 0, touch_y = 0;
 static bool touch_x_called = false, touch_y_called = false;
@@ -440,6 +441,11 @@ static void dt2w_input_callback(struct work_struct *unused)
 static void wg_input_event(struct input_handle *handle, unsigned int type,
 				unsigned int code, int value)
 {
+	// ignore all input events in phone calls
+	if (is_incall) {
+		return;
+	}
+
 #if WG_DEBUG
 	pr_info("wg: code: %s|%u, val: %i\n",
 		((code==ABS_MT_POSITION_X) ? "X" :

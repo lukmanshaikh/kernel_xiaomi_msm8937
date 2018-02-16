@@ -30,6 +30,7 @@ extern int dt2w_switch;
 extern int dt2w_switch_temp;
 extern bool dt2w_switch_changed;
 extern bool gestures_enabled;
+extern bool is_incall;
 bool scr_suspended_ist(void);
 bool scr_suspended_ft(void);
 void set_vibrate(int value);
