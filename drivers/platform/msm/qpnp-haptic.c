@@ -362,7 +362,7 @@ struct qpnp_hap {
 	u32 vmax_mv;
 	u32 vtg_min;
 	u32 vtg_max;
-	u32 vtg_default;
+	u32 vtg_level;
 	u32 ilim_ma;
 	u32 sc_deb_cycles;
 	u32 int_pwm_freq_khz;
@@ -1448,7 +1448,7 @@ static ssize_t qpnp_hap_max_show(struct device *dev,
 	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_max);
 }
 
-static ssize_t qpnp_hap_default_show(struct device *dev,
+static ssize_t qpnp_hap_level_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
@@ -1456,7 +1456,38 @@ static ssize_t qpnp_hap_default_show(struct device *dev,
 	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
 					 timed_dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_default);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_level);
+}
+
+static ssize_t qpnp_hap_level_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+	u32 data;
+	int rc;
+
+	if (sscanf(buf, "%d", &data) != 1)
+		return -EINVAL;
+
+	if (data < hap->vtg_min) {
+		pr_err("%s: mv %d not in range (%d - %d), using min.", __func__, data,
+				hap->vtg_min, hap->vtg_max);
+		data = hap->vtg_min;
+	} else if (data > hap->vtg_max) {
+		pr_err("%s: mv %d not in range (%d - %d), using max.", __func__, data,
+				hap->vtg_min, hap->vtg_max);
+		data = hap->vtg_max;
+	}
+
+	hap->vtg_level = data;
+	hap->vmax_mv = data;
+	rc = qpnp_hap_vmax_config(hap);
+	if (rc)
+		pr_info("qpnp: error while writing vibration control register\n");
+
+	return strnlen(buf, count);
 }
 
 /* sysfs attributes */
@@ -1506,7 +1537,7 @@ static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(min_max_test, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_hap_min_max_test_data_show,
 			qpnp_hap_min_max_test_data_store),
-	__ATTR(vtg_level, (S_IRUGO | S_IWUSR | S_IWGRP),
+	__ATTR(vtg_default, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_hap_vmax_mv_show,
 			qpnp_hap_vmax_mv_store),
 	__ATTR(vtg_min, S_IRUGO,
@@ -1515,9 +1546,9 @@ static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(vtg_max, S_IRUGO,
 			qpnp_hap_max_show,
 			NULL),
-	__ATTR(vtg_default, S_IRUGO,
-			qpnp_hap_default_show,
-			NULL),
+	__ATTR(vtg_level, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_hap_level_show,
+			qpnp_hap_level_store),
 };
 
 static int calculate_lra_code(struct qpnp_hap *hap)
@@ -2548,7 +2579,8 @@ static int qpnp_hap_parse_dt(struct qpnp_hap *hap)
 	else if (hap->vmax_mv > hap->vtg_max)
 		hap->vmax_mv = hap->vtg_max;
 
-	hap->vtg_default = hap->vmax_mv;
+	// set default intensity 75%
+	hap->vtg_level = hap->vtg_max - (hap->vtg_max - hap->vtg_min) / 4;
 
 	hap->ilim_ma = QPNP_HAP_ILIM_MIN_MV;
 	rc = of_property_read_u32(spmi->dev.of_node,
