@@ -650,9 +650,6 @@ KBUILD_CFLAGS += $(call cc-disable-warning,format-overflow,)
 # Needed to unbreak GCC 7.x and above
 KBUILD_CFLAGS += $(call cc-option,-fno-store-merging,)
 
-include $(srctree)/arch/$(SRCARCH)/Makefile
-
-ifdef CONFIG_READABLE_ASM
 # Disable optimizations that make assembler listings hard to read.
 # reorder blocks reorders the control in the function
 # ipa clone creates specialized cloned functions
@@ -1631,8 +1628,6 @@ endif
 # Usage:
 # $(Q)$(MAKE) $(clean)=dir
 clean := -f $(srctree)/scripts/Makefile.clean obj
-
-endif	# skip-makefile
 
 PHONY += FORCE
 FORCE:
