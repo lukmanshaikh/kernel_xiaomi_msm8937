@@ -1281,9 +1281,6 @@ static void ist30xx_irq_handler(int irq, bool active)
 static int ist30xx_suspend(struct device *dev)
 {
 	struct ist30xx_data *data = dev_get_drvdata(dev);
-#ifdef CONFIG_WAKE_GESTURES
-	int i;
-#endif
 
 	if (data->debugging_mode)
 		return 0;
@@ -1293,7 +1290,7 @@ static int ist30xx_suspend(struct device *dev)
 
 		if (!ev_btn_status) {
 			/* release all touches */
-			for (i = 0; i < IST30XX_MAX_MT_FINGERS; i++) {
+			for (int i = 0; i < IST30XX_MAX_MT_FINGERS; i++) {
 				input_mt_slot(data->input_dev, i);
 				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 0);
 			}
