@@ -1290,13 +1290,7 @@ static int ist30xx_suspend(struct device *dev)
 
 		if (!ev_btn_status) {
 			/* release all touches */
-			for (int i = 0; i < IST30XX_MAX_MT_FINGERS; i++) {
-				input_mt_slot(data->input_dev, i);
-				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 0);
-			}
-			input_mt_report_pointer_emulation(data->input_dev, false);
-			__clear_bit(BTN_TOUCH, data->input_dev->keybit);
-			input_sync(data->input_dev);
+			clear_input_data(data);
 			ev_btn_status = true;
 		}
 		ist30xx_irq_handler(data->client->irq, true);
@@ -1351,7 +1345,6 @@ static int ist30xx_resume(struct device *dev)
 	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
 
 		if (ev_btn_status) {
-			__set_bit(BTN_TOUCH, data->input_dev->keybit);
 			input_sync(data->input_dev);
 			ev_btn_status = false;
 		}
