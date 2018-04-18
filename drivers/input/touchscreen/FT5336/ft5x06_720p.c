@@ -641,12 +641,13 @@ static int ft5x06_ts_suspend(struct device *dev)
 			input_sync(data->input_dev);
 			ev_btn_status = true;
 		}
-		ts_suspended = true;
 
 		err = enable_irq_wake(data->client->irq);
 		if (err)
 			dev_err(&data->client->dev,
 				"%s: set_irq_wake failed\n", __func__);
+		data->suspended = true;
+		ts_suspended = true;
 
 		if (dt2w_switch_changed) {
 			dt2w_switch = dt2w_switch_temp;
@@ -728,10 +729,11 @@ static int ft5x06_ts_resume(struct device *dev)
 			ev_btn_status = false;
 		}
 		err = disable_irq_wake(data->client->irq);
-		ts_suspended = false;
 		if (err)
 			dev_err(dev, "%s: disable_irq_wake failed\n",
 				__func__);
+		data->suspended = false;
+		ts_suspended = false;
 
 		return err;
 	}
