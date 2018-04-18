@@ -87,7 +87,7 @@ bool s2w_switch_changed = false;
 int dt2w_switch = DT2W_DEFAULT;
 int dt2w_switch_temp;
 bool dt2w_switch_changed = false;
-int dt2s_switch = DT2S_DEFAULT;
+static int dt2s_switch = DT2S_DEFAULT;
 bool dt2s_switch_changed = false;
 bool is_incall = false;
 static int s2s_switch = S2S_DEFAULT;
