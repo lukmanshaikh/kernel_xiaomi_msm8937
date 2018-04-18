@@ -1286,7 +1286,7 @@ static int ist30xx_suspend(struct device *dev)
 		return 0;
 
 #ifdef CONFIG_WAKE_GESTURES
-	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+	if (s2w_switch || dt2w_switch) {
 
 		if (!ev_btn_status) {
 			/* release all touches */
@@ -1329,6 +1329,8 @@ static int ist30xx_suspend(struct device *dev)
 #endif
 	mutex_unlock(&ist30xx_mutex);
 
+	ts_suspended = true;
+
 	return 0;
 }
 
@@ -1342,7 +1344,7 @@ static int ist30xx_resume(struct device *dev)
 		return 0;
 
 #ifdef CONFIG_WAKE_GESTURES
-	if (device_may_wakeup(dev) && (s2w_switch || dt2w_switch)) {
+	if (s2w_switch || dt2w_switch) {
 
 		if (ev_btn_status) {
 			input_sync(data->input_dev);
@@ -1377,6 +1379,8 @@ static int ist30xx_resume(struct device *dev)
 	ist30xx_start(data);
 	ist30xx_enable_irq(data);
 	mutex_unlock(&ist30xx_mutex);
+
+	ts_suspended = false;
 
 #if CTP_CHARGER_DETECT
 	schedule_delayed_work(&data->work_charger_check,
@@ -2175,10 +2179,6 @@ static int ist30xx_probe(struct i2c_client *client,
 				   "ist30xx_ts", data);
 	if (unlikely(ret))
 		goto err_init_drv;
-
-#ifdef CONFIG_WAKE_GESTURES
-	device_init_wakeup(&client->dev, 1);
-#endif
 
 	ist30xx_disable_irq(data);
 	data->status.event_mode = false;
