@@ -88,7 +88,6 @@ int dt2w_switch = DT2W_DEFAULT;
 int dt2w_switch_temp;
 bool dt2w_switch_changed = false;
 int dt2s_switch = DT2S_DEFAULT;
-int dt2s_switch_temp;
 bool dt2s_switch_changed = false;
 bool is_incall = false;
 static int s2s_switch = S2S_DEFAULT;
@@ -660,18 +659,9 @@ static ssize_t doubletap2sleep_show(struct device *dev,
 static ssize_t doubletap2sleep_dump(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	sscanf(buf, "%d ", &dt2s_switch_temp);
-	// KA sets switch to 2 under 'Full' setting, fallback to 1..
-	if (dt2s_switch_temp == 2)
-		dt2s_switch_temp = 1;
-
-	if (dt2s_switch_temp < 0 || dt2s_switch_temp > 1)
-		dt2s_switch_temp = 0;
-		
-	if (!is_suspended())
-		dt2s_switch = dt2s_switch_temp;
-	else
-		dt2s_switch_changed = true;
+	sscanf(buf, "%d ", &dt2s_switch);
+	if (dt2s_switch < 0 || dt2s_switch > 1)
+		dt2s_switch = 0;				
 
 	return count;
 }
