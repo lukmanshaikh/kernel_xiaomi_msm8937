@@ -504,10 +504,8 @@ static int input_dev_filter(struct input_dev *dev) {
 	} else if (strstr(dev->name, "ist30xx_ts_input")) {
 		hw_version = IMAGIS;
 		return 0;
-	} else {
-		return 1;
 	}
-	return 0;
+	return 1;
 }
 
 static int wg_input_connect(struct input_handler *handler,
