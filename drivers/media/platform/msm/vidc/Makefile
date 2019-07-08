@@ -1,4 +1,4 @@
-CFLAGS_hfi_response_handler.o := -Wno-frame-larger-than=
+CFLAGS_hfi_response_handler.o := $(call cc-option,-Wno-frame-larger-than=)
 obj-$(CONFIG_MSM_VIDC_V4L2) := 	msm_v4l2_vidc.o \
 				msm_vidc_common.o \
 				msm_vidc.o \
